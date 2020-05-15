@@ -1,0 +1,183 @@
+# Script: Main script
+
+# Main config file
+source $HOME/.cscipipe/conf
+#! $mconf_bashexec
+
+#echo $args_return
+if [ ! -z "$conf" ]; then
+	source $conf # config file in the local directory can override the default ones
+fi
+
+
+cwd=`pwd`
+cwd=`readlink -f $cwd`
+export cwd=$cwd	
+export cscipipeCommand="$@"
+
+export commandName=$(readlink -f `echo $0`)
+
+# export variables
+set -a # exports the variables as environment variables --> Useful for R scripts
+source $mconf_installdir/src/basic_functions.sh
+source $mconf_installdir/src/general_args.sh
+
+set +a # switch it back off
+
+set -Eo pipefail
+
+if [ $# -eq 0 ] ; then
+	commandsHelp
+fi
+
+cscipipe_cmd=""
+
+#@ List of programs available
+#@ --------------------------
+
+case "$1" in
+
+#@ RNASeq
+ 	"star" ) #@ Run STAR aligner
+	    cscipipe_cmd="source $mconf_installdir/bin/rna_seq/star.sh" ;;
+	"salmon" ) #@ Run Salmon aligner 
+	    cscipipe_cmd="source $mconf_installdir/bin/rna_seq/salmon.sh" ;;
+	"countTableSTAR" ) #@ Generates gene count table from star aligner
+		cscipipe_cmd="source $mconf_installdir/bin/rna_seq/countTableSTAR.sh" ;;
+	"featureCounts" ) #@ Generates gene count table from star aligner
+		cscipipe_cmd="source $mconf_installdir/bin/rna_seq/featureCounts.sh" ;;
+	"deseq2" ) #@ Run DESeq2
+		cscipipe_cmd="$mconf_Rscript $mconf_installdir/bin/rna_seq/deseq2.R" ;;
+	"countTableToTPM" ) #@ Converts count tables to RPKMs and TPMs
+		#echo "$mconf_installdir/bin/rna_seq/fpkmTpm.R" ;
+		#cscipipe_cmd="$mconf_Rscript $mconf_installdir/bin/rna_seq/fpkmTpm.R" ;;
+		echo "$mconf_installdir/bin/rna_seq/countTableToTPM.R" ;
+		cscipipe_cmd="$mconf_Rscript $mconf_installdir/bin/rna_seq/countTableToTPM.R" ;;
+	
+ #@-Fusion
+	"ericscript" ) #@ EricScript
+		cscipipe_cmd="source $mconf_installdir/bin/rna_seq/ericscript.sh" ;;
+ #@-Splicing 
+	"miso" ) #@ Miso
+	    cscipipe_cmd="source $mconf_installdir/bin/rna_seq/miso.sh" ;;
+	"spladder" ) #@ Spladder
+	    cscipipe_cmd="source $mconf_installdir/bin/rna_seq/spladder.sh" ;;
+	"rmats" ) #@ RMATS
+	    cscipipe_cmd="source $mconf_installdir/bin/rna_seq/rmats.sh" ;;
+	
+#@ Chipseq	
+	"macs2" ) #@ MACS2
+		cscipipe_cmd="source $mconf_installdir/bin/chipseq/macs2.sh" ;;
+	"homerCreateTagDir" ) #@ Create Homer tag directory from bam file
+		cscipipe_cmd="source $mconf_installdir/bin/chipseq/homerCreateTagDir.sh" ;;
+	"homerHistonePeaks" ) #@ Homer histone marks
+		cscipipe_cmd="source $mconf_installdir/bin/chipseq/homerHistonePeaks.sh" ;;
+	"bwa" ) #@ align using bwa
+		cscipipe_cmd="source $mconf_installdir/bin/chipseq/bwa.sh" ;;
+	"diffbind" ) #@ differential binding of peaks
+		cscipipe_cmd="source $mconf_installdir/bin/chipseq/diffbind.sh" ;;
+
+#@ CRISPR
+	"mageckCount" ) #@ count using MAGeCK
+		cscipipe_cmd="source $mconf_installdir/bin/crispr/mageckCount.sh" ;;
+	"mageckCompare" ) #@ compare using MAGeCK
+		cscipipe_cmd="source $mconf_installdir/bin/crispr/mageckCompare.sh" ;;	
+	"mageckXYsgRNA" ) #@ plot MAGeCK output
+		cscipipe_cmd="source $mconf_installdir/bin/crispr/mageckXYsgRNA.sh" ;;
+	"mageckTtest" ) #@ t-test using MAGeCK
+		cscipipe_cmd="$mconf_Rscript $mconf_installdir/bin/crispr/mageckTtest.R" ;;	
+	"crisprCounter" ) #@ Custom CRISPR counter
+		cscipipe_cmd="source $mconf_installdir/bin/crispr/crisprCounter.sh" ;;
+	"crisprCountTable" ) #@ Custom CRISPR counts to table format
+		cscipipe_cmd="python3 $mconf_installdir/bin/crispr/crisprCountTable.py" ;;
+
+#@ RRBS-seq
+	"bismark" ) #@ Run bismark aligner
+		cscipipe_cmd="source $mconf_installdir/bin/methylseq/bismark.sh" ;;
+	"bismark_extractor" ) #@ Run bismark methylation extractor
+		cscipipe_cmd="source $mconf_installdir/bin/methylseq/bismark_extractor.sh" ;;
+	"methylKitPrelim" ) #@ Generates input files for methylKit from Bismark bam files
+		cscipipe_cmd="source $mconf_installdir/bin/methylseq/methylKitPrelim.sh" ;;
+	"methylKitCompare" ) #@ Compares two conditions using MethylKit (bp and tiled)
+		cscipipe_cmd="source $mconf_installdir/bin/methylseq/methylKitCompare.sh" ;;
+	"methylKitDMR" ) #@ Compares two conditions using MethylKit (DMRs)
+		cscipipe_cmd="source $mconf_installdir/bin/methylseq/methylKitDMR.sh" ;;
+
+	
+#@ Farm 
+	"farmsub" ) #@ Submit to farm
+		cscipipe_cmd="source $mconf_installdir/bin/farmsub.sh" ;;
+	"farmhist" ) #@ Get history of farm jobs in that folder
+		#cscipipe_cmd="$mconf_php $mconf_installdir/bin/farm/farmhist.php" ;;
+		cscipipe_cmd="$mconf_bashexec $mconf_installdir/bin/farm/farmhist.sh" ;;
+	"sendMail" ) #@ send email when farm job completes
+		source $mconf_installdir/bin/misc/sendMail.sh &   exit 0 ;;
+		
+
+			
+#@ Downloads
+ #@-iRODS
+	"irodsDownload" ) #@ Download from iRODs
+		cscipipe_cmd="source $mconf_installdir/bin/download/irodsDownload.sh" ;;
+	"irodsDownloadFromInfo" ) #@ Download from information file
+		cscipipe_cmd="source $mconf_installdir/bin/download/irodsDownloadFromInfo.sh" ;;
+	"irodsSampleInfo" ) #@ Get info for iRODs samples
+		cscipipe_cmd="source $mconf_installdir/bin/download/irodsSampleInfo.sh" ;;
+	"irodsRunInfo" ) #@ Get info for iRODs runs
+		cscipipe_cmd="source $mconf_installdir/bin/download/irodsRunInfo.sh" ;;
+	"createProject" )#@ Create project file from input csv/tsv
+		cscipipe_cmd="$mconf_Rscript $mconf_installdir/bin/download/createProject.R" ;;
+	"irodsInfo" ) #@ Get info for iRODs samples
+		cscipipe_cmd="source $mconf_installdir/bin/download/irodsInfo.sh" ;;
+	
+ #@-Public
+ 	"enaDownload" ) #@ Download data from ENA
+ 		cscipipe_cmd="source $mconf_installdir/bin/download/enaDownload.sh" ;;
+
+#@ Procs
+	"irodsMergeCramsToBam" ) #@ Merge cram files in folders to single bam
+		cscipipe_cmd="source $mconf_installdir/bin/procs/irodsMergeCramsToBam.sh" ;;
+	"sormadup" )  #@ sort sam, bam files
+		cscipipe_cmd="source $mconf_installdir/bin/procs/sormadup.sh" ;;
+	"bedGraphToBigWig" ) #@ bedgraph to bw
+		cscipipe_cmd="source $mconf_installdir/bin/procs/bedGraphToBigWig.sh" ;;
+	"bammerge" )  #@ merge bam files
+		cscipipe_cmd="source $mconf_installdir/bin/procs/bammerge.sh" ;;
+	"bam2bw" )  #@ bam to bw
+		cscipipe_cmd="source $mconf_installdir/bin/procs/bam2bw.sh" ;;
+	"bam2bdg" )  #@ bam to bedgraph
+		cscipipe_cmd="source $mconf_installdir/bin/procs/bam2bdg.sh" ;;
+	"bam2fq" )  #@ bam to fastq
+		cscipipe_cmd="source $mconf_installdir/bin/procs/bam2fq.sh" ;;
+	"cram2bam" )  #@ single cram to  single bam
+		cscipipe_cmd="source $mconf_installdir/bin/procs/cram2bam.sh" ;;
+	"cram2fastq" )  #@ cram to fastq
+		cscipipe_cmd="source $mconf_installdir/bin/procs/cram2fastq.sh" ;;
+	"filterCols" )  #@ filter columns from a csv or tsv file
+		cscipipe_cmd="$mconf_Rscript $mconf_installdir/bin/procs/filterCols.R" ;;
+
+	
+#@ Stats	
+	"bamStatSortIndex" )  #@ bam stat, sort and index
+		cscipipe_cmd="source $mconf_installdir/bin/stats/bamStatSortIndex.sh" ;;
+	"gsea" ) #@ Gene Set Enrichment Analysis
+		cscipipe_cmd="source $mconf_installdir/bin/stats/gsea.sh" ;;
+	"hist" )  #@ history of the suite
+		export nohistory=1 ; 
+		cscipipe_cmd="source $mconf_installdir/bin/stats/hist.sh " ;;	
+
+#@ Visualisation
+	"ucscCreateHub" ) #@ create hub for upload to genome browser
+		cscipipe_cmd="source $mconf_installdir/bin/visualisation/ucscCreateHub.sh" ;;
+
+# Test tools
+	"test" )
+		cscipipe_cmd="source $mconf_installdir/bin/test/test.sh" ;;
+	"testR" )
+		cscipipe_cmd="$mconf_Rscript $mconf_installdir/bin/test/test.R" ;;
+	*) 
+		warnsms "Provide a valid command"; commandsHelp  ;;
+esac
+
+$cscipipe_cmd
+copy_command "$cscipipe_cmd"
